@@ -13,6 +13,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.auth.exceptions import RefreshError
 
 # Gmail API scope - tikai lasīšana
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -34,8 +35,18 @@ def authenticate_gmail():
     # Ja nav derīgu credentials, ļaujam lietotājam pieteikties
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except RefreshError as e:
+                # Ja ir scope kļūda, izdzēšam token.json un mēģinam no jauna
+                print(f"⚠️  OAuth token kļūda: {e}")
+                print("🔄 Izdzēšu veco token un mēģināšu no jauna...")
+                if os.path.exists('token.json'):
+                    os.remove('token.json')
+                creds = None
+
+        # Ja joprojām nav credentials, autentificējamies no jauna
+        if not creds:
             if not os.path.exists('credentials.json'):
                 print("❌ KĻŪDA: Nav atrasts credentials.json fails!")
                 print("   Lūdzu sekojiet instrukcijām README.md failā.")
