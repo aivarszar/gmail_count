@@ -111,22 +111,29 @@ def search_email_in_gmail(service, email_address):
         # Gmail meklēšanas query - meklējam TO laukā
         query = f'to:{email_address}'
 
-        # Meklējam ziņojumus
-        results = service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=1  # Mums pietiek zināt, vai ir vismaz viens rezultāts
-        ).execute()
+        # Iegūstam precīzu ziņojumu skaitu ar pagination
+        total_count = 0
+        page_token = None
+        max_results_per_page = 500  # Maksimums, ko Gmail API atļauj
 
-        messages = results.get('messages', [])
+        while True:
+            # Meklējam ziņojumus
+            results = service.users().messages().list(
+                userId='me',
+                q=query,
+                maxResults=max_results_per_page,
+                pageToken=page_token
+            ).execute()
 
-        # Ja vajag precīzu skaitu, var iegūt resultSizeEstimate
-        if messages:
-            # Iegūstam kopējo skaitu
-            total_results = results.get('resultSizeEstimate', len(messages))
-            return total_results
+            messages = results.get('messages', [])
+            total_count += len(messages)
 
-        return 0
+            # Pārbaudam vai ir vairāk rezultātu
+            page_token = results.get('nextPageToken')
+            if not page_token:
+                break
+
+        return total_count
 
     except HttpError as error:
         print(f"   ⚠️  Kļūda meklējot {email_address}: {error}")
